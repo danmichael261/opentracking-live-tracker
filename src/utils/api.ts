@@ -19,3 +19,9 @@ export async function fetchConfig(event: string): Promise<ConfigResponse> {
   if (!res.ok) throw new Error(`Failed to fetch event config (${res.status})`);
   return res.json();
 }
+
+export async function fetchRoute(event: string): Promise<string> {
+  const res = await fetch(`${API_BASE}?event=${encodeURIComponent(event)}&file=${encodeURIComponent(event)}.kml`);
+  if (!res.ok) throw new Error(`Failed to fetch route KML (${res.status})`);
+  return res.text();
+}
