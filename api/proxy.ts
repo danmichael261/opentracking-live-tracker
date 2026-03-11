@@ -16,13 +16,15 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: 'Missing required parameters: event and file' });
   }
 
-  if (!ALLOWED_FILES.includes(file)) {
-    return res.status(400).json({ error: `Invalid file. Allowed: ${ALLOWED_FILES.join(', ')}` });
-  }
-
   // Sanitize event slug (alphanumeric, hyphens, underscores only)
   if (!/^[a-zA-Z0-9_-]+$/.test(event)) {
     return res.status(400).json({ error: 'Invalid event slug' });
+  }
+
+  // Allow JSON data files and KML route files ({event}.kml)
+  const isKml = file.endsWith('.kml') && /^[a-zA-Z0-9_-]+\.kml$/.test(file);
+  if (!ALLOWED_FILES.includes(file) && !isKml) {
+    return res.status(400).json({ error: `Invalid file. Allowed: ${ALLOWED_FILES.join(', ')} or {event}.kml` });
   }
 
   const url = `https://live.opentracking.co.uk/${event}/data/${file}`;
@@ -37,9 +39,10 @@ export default async function handler(req: any, res: any) {
     }
 
     const data = await response.text();
+    const contentType = isKml ? 'application/xml' : 'application/json';
 
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=30');
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
     res.setHeader('Access-Control-Allow-Origin', '*');
     return res.status(200).send(data);
   } catch (err: any) {
