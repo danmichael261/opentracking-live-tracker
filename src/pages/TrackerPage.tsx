@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { RefreshCw, ArrowLeft, Share2, AlertCircle } from 'lucide-react';
+import { RefreshCw, ArrowLeft, Share2, AlertCircle, Bell } from 'lucide-react';
 import { TrackerStatus, RunnerData } from '../types';
 import { fetchTeams, fetchCheckpoints, fetchConfig } from '../utils/api';
 import { computePositions } from '../utils/positions';
 import { RaceMap } from '../components/RaceMap';
 import { StatsPanel } from '../components/StatsPanel';
+import { NotifyModal } from '../components/NotifyModal';
 
 const REFRESH_INTERVAL = 30000; // 30 seconds
 
@@ -18,6 +19,7 @@ export const TrackerPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [copied, setCopied] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
 
   const bibNumber = parseInt(bib || '0', 10);
 
@@ -167,6 +169,11 @@ export const TrackerPage: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="tooltip tooltip-bottom" data-tip="Get notifications">
+            <button className="btn btn-ghost btn-sm btn-square" onClick={() => setNotifyOpen(true)}>
+              <Bell size={16} />
+            </button>
+          </div>
           <div className="tooltip tooltip-bottom" data-tip={copied ? 'Copied!' : 'Copy link'}>
             <button className="btn btn-ghost btn-sm btn-square" onClick={handleShare}>
               <Share2 size={16} />
@@ -198,6 +205,15 @@ export const TrackerPage: React.FC = () => {
           <StatsPanel status={status} lastRefresh={lastRefresh} />
         </div>
       </div>
+
+      {/* Notification subscription modal */}
+      <NotifyModal
+        isOpen={notifyOpen}
+        onClose={() => setNotifyOpen(false)}
+        eventCode={event || ''}
+        bibNumber={bibNumber}
+        runnerName={status.runnerName}
+      />
     </div>
   );
 };
