@@ -169,11 +169,6 @@ export const TrackerPage: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <div className="tooltip tooltip-bottom" data-tip="Get notifications">
-            <button className="btn btn-ghost btn-sm btn-square" onClick={() => setNotifyOpen(true)}>
-              <Bell size={16} />
-            </button>
-          </div>
           <div className="tooltip tooltip-bottom" data-tip={copied ? 'Copied!' : 'Copy link'}>
             <button className="btn btn-ghost btn-sm btn-square" onClick={handleShare}>
               <Share2 size={16} />
@@ -194,7 +189,7 @@ export const TrackerPage: React.FC = () => {
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         {/* Map */}
         <div className="h-[55vh] md:h-auto md:flex-1 relative">
-          <RaceMap status={status} />
+          <RaceMap status={status} event={event || ''} />
           <div className="absolute bottom-2 left-2 badge badge-neutral badge-sm opacity-80">
             Auto-refresh: 30s
           </div>
@@ -203,6 +198,17 @@ export const TrackerPage: React.FC = () => {
         {/* Stats sidebar */}
         <div className="flex-1 md:flex-none md:w-80 overflow-y-auto border-t md:border-t-0 md:border-l border-base-300 bg-base-100">
           <StatsPanel status={status} lastRefresh={lastRefresh} />
+
+          {/* Live Updates button */}
+          <div className="px-4 pb-4">
+            <button
+              className="btn btn-primary btn-block gap-2"
+              onClick={() => setNotifyOpen(true)}
+            >
+              <Bell size={18} />
+              Live Updates
+            </button>
+          </div>
         </div>
       </div>
 
