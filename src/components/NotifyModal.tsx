@@ -93,7 +93,7 @@ export const NotifyModal: React.FC<NotifyModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={handleClose}>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={handleClose}>
       <div
         className="card bg-base-100 shadow-2xl w-full max-w-sm animate-in"
         onClick={(e) => e.stopPropagation()}
