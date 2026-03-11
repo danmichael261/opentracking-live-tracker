@@ -1,15 +1,45 @@
 import React, { useEffect, useRef } from 'react';
 import { TrackerStatus } from '../types';
+import { fetchRoute } from '../utils/api';
+
+declare const L: any;
 
 interface RaceMapProps {
   status: TrackerStatus;
+  event: string;
 }
 
-export const RaceMap: React.FC<RaceMapProps> = ({ status }) => {
+/** Parse KML text and extract route coordinates as [lat, lng] pairs */
+function parseKML(kmlText: string): [number, number][] {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(kmlText, 'text/xml');
+  const coords: [number, number][] = [];
+
+  // Find all <coordinates> elements (handles namespaced KML)
+  const coordElements = doc.getElementsByTagName('coordinates');
+  for (let i = 0; i < coordElements.length; i++) {
+    const text = coordElements[i].textContent || '';
+    const points = text.trim().split(/\s+/);
+    for (const point of points) {
+      const parts = point.split(',');
+      if (parts.length >= 2) {
+        const lon = parseFloat(parts[0]);
+        const lat = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          coords.push([lat, lon]); // Leaflet uses [lat, lng]
+        }
+      }
+    }
+  }
+  return coords;
+}
+
+export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const cpMarkersRef = useRef<any[]>([]);
+  const routeRef = useRef<any>(null);
 
   // Determine initial center: runner position or first checkpoint
   const getCenter = (): [number, number] => {
@@ -68,12 +98,41 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status }) => {
       });
     }
 
-    // Fit bounds to show all checkpoints + runner
+    // Initial fit bounds to checkpoints + runner
     const allPoints: [number, number][] = status.checkpoints.map((cp) => [cp.la, cp.lo]);
     if (status.lat !== 0 || status.lon !== 0) allPoints.push([status.lat, status.lon]);
     if (allPoints.length > 1) {
       map.fitBounds(allPoints, { padding: [30, 30] });
     }
+
+    // Fetch and overlay KML race route
+    fetchRoute(event)
+      .then((kmlText) => {
+        const routeCoords = parseKML(kmlText);
+        if (routeCoords.length > 0 && mapInstance.current) {
+          routeRef.current = L.polyline(routeCoords, {
+            color: '#f59e0b',
+            weight: 4,
+            opacity: 0.8,
+            dashArray: null,
+            lineJoin: 'round',
+          }).addTo(mapInstance.current);
+
+          // Re-fit bounds to include route
+          const routeBounds = routeRef.current.getBounds();
+          const cpBounds = L.latLngBounds(
+            status.checkpoints.map((cp: any) => [cp.la, cp.lo])
+          );
+          const combined = routeBounds.extend(cpBounds);
+          if (status.lat !== 0 || status.lon !== 0) {
+            combined.extend([status.lat, status.lon]);
+          }
+          mapInstance.current.fitBounds(combined, { padding: [30, 30] });
+        }
+      })
+      .catch(() => {
+        // KML not available for this event — silently continue without route
+      });
 
     return () => {
       map.remove();
