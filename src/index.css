@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes pulse-marker {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.leaflet-container {
+  font-family: inherit;
+}
+
+.runner-marker {
+  animation: pulse-marker 2s infinite;
+}
