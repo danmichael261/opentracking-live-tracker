@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Send } from 'lucide-react';
 import { Cheer } from '../types';
 
@@ -15,11 +15,15 @@ export const CheerWall: React.FC<CheerWallProps> = ({ eventCode, bibNumber }) =>
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const fetchCheers = useCallback(async () => {
+  const fetchCheers = useCallback(async (bustCache = false) => {
     try {
+      // Add cache-busting param after a new cheer is submitted
+      const cacheBust = bustCache ? `&_t=${Date.now()}` : '';
       const res = await fetch(
-        `/api/cheers?event=${encodeURIComponent(eventCode)}&bib=${bibNumber}`
+        `/api/cheers?event=${encodeURIComponent(eventCode)}&bib=${bibNumber}${cacheBust}`,
+        bustCache ? { cache: 'no-store' } : undefined
       );
       if (res.ok) {
         const data = await res.json();
@@ -34,7 +38,7 @@ export const CheerWall: React.FC<CheerWallProps> = ({ eventCode, bibNumber }) =>
   useEffect(() => {
     fetchCheers();
     // Refresh cheers every 60 seconds
-    const interval = setInterval(fetchCheers, 60000);
+    const interval = setInterval(() => fetchCheers(), 60000);
     return () => clearInterval(interval);
   }, [fetchCheers]);
 
@@ -72,11 +76,32 @@ export const CheerWall: React.FC<CheerWallProps> = ({ eventCode, bibNumber }) =>
         setError(data.error || 'Failed to send cheer');
       } else {
         setSuccess(true);
+        const sentMessage = message.trim();
+        const sentName = name.trim();
         setMessage('');
+
         // Save name for next time
-        try { localStorage.setItem('cheer_name', name.trim()); } catch {}
-        fetchCheers();
-        setTimeout(() => setSuccess(false), 3000);
+        try { localStorage.setItem('cheer_name', sentName); } catch {}
+
+        // Optimistically add the new cheer to the list immediately
+        const optimisticCheer: Cheer = {
+          id: Date.now(), // temp id
+          sender_name: sentName,
+          message: sentMessage,
+          created_at: new Date().toISOString(),
+        };
+        setCheers(prev => [optimisticCheer, ...prev]);
+
+        // Also fetch fresh data (cache-busted) to sync with server
+        setTimeout(() => fetchCheers(true), 1000);
+
+        // Scroll to top of cheers list to show the new cheer
+        setTimeout(() => {
+          listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
+
+        // Keep success message visible for 5 seconds
+        setTimeout(() => setSuccess(false), 5000);
       }
     } catch {
       setError('Failed to send cheer. Please try again.');
@@ -137,10 +162,10 @@ export const CheerWall: React.FC<CheerWallProps> = ({ eventCode, bibNumber }) =>
         </div>
 
         {error && (
-          <div className="text-error text-xs">{error}</div>
+          <div className="alert alert-error py-2 text-sm">⚠️ {error}</div>
         )}
         {success && (
-          <div className="text-success text-xs">Cheer sent! 🎉</div>
+          <div className="alert alert-success py-2 text-sm">🎉 Cheer sent!</div>
         )}
 
         <button
@@ -163,7 +188,7 @@ export const CheerWall: React.FC<CheerWallProps> = ({ eventCode, bibNumber }) =>
           No cheers yet — be the first! 🎉
         </div>
       ) : (
-        <div className="space-y-2 max-h-60 overflow-y-auto">
+        <div ref={listRef} className="space-y-2 max-h-60 overflow-y-auto">
           {cheers.map((cheer) => (
             <div key={cheer.id} className="bg-base-200 rounded-lg p-2.5">
               <div className="flex items-center justify-between gap-2">
