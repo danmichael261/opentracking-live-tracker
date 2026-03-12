@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Clock, Zap, Battery, Trophy, Users, Flag, Award, Activity } from 'lucide-react';
+import { Clock, Zap, Trophy, Users, Flag, Award, Activity } from 'lucide-react';
 import { TrackerStatus } from '../types';
 
 interface StatsPanelProps {
@@ -57,7 +57,6 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({ status, lastRefresh }) =
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-2 mt-1">
-        <StatCard icon={<MapPin size={16} />} label="Last Checkpoint" value={runner.lc || 'N/A'} />
         <StatCard icon={<Flag size={16} />} label="Next Checkpoint" value={nextCp || (runner.fin === 1 ? 'Done!' : 'N/A')} />
         <StatCard icon={<Clock size={16} />} label="Elapsed Time" value={status.elapsedTime} />
         <StatCard icon={<Zap size={16} />} label="Speed" value={speed > 0 ? `${runner.sp} km/h` : 'N/A'} />
@@ -75,11 +74,6 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({ status, lastRefresh }) =
           icon={<Users size={16} />}
           label="Overall Pos"
           value={`${status.overallPosition} / ${status.overallTotal}`}
-        />
-        <StatCard
-          icon={<Battery size={16} className={getBatteryColor(runner.b)} />}
-          label="Battery"
-          value={`${runner.b}%`}
         />
       </div>
 
