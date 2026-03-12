@@ -15,7 +15,6 @@ function parseKML(kmlText: string): [number, number][] {
   const doc = parser.parseFromString(kmlText, 'text/xml');
   const coords: [number, number][] = [];
 
-  // Find all <coordinates> elements (handles namespaced KML)
   const coordElements = doc.getElementsByTagName('coordinates');
   for (let i = 0; i < coordElements.length; i++) {
     const text = coordElements[i].textContent || '';
@@ -26,7 +25,7 @@ function parseKML(kmlText: string): [number, number][] {
         const lon = parseFloat(parts[0]);
         const lat = parseFloat(parts[1]);
         if (!isNaN(lat) && !isNaN(lon)) {
-          coords.push([lat, lon]); // Leaflet uses [lat, lng]
+          coords.push([lat, lon]);
         }
       }
     }
@@ -40,14 +39,15 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
   const markerRef = useRef<any>(null);
   const cpMarkersRef = useRef<any[]>([]);
   const routeRef = useRef<any>(null);
+  const runnerDotsRef = useRef<any[]>([]);
 
-  // Determine initial center: runner position or first checkpoint
   const getCenter = (): [number, number] => {
     if (status.lat !== 0 || status.lon !== 0) return [status.lat, status.lon];
     if (status.checkpoints.length > 0) return [status.checkpoints[0].la, status.checkpoints[0].lo];
     return [54.5, -2.5]; // UK default
   };
 
+  // Initialize map (runs once)
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
@@ -82,23 +82,27 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
       cpMarkersRef.current.push(m);
     });
 
-    // Runner marker (only if we have coordinates)
+    // Tracked runner marker with 🏃 emoji
     if (status.lat !== 0 || status.lon !== 0) {
       const runnerIcon = L.divIcon({
         className: 'runner-marker',
-        html: `<div style="background:#2196F3;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.5);">🏃</div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
+        html: `<div style="background:#2196F3;color:#fff;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.5);">🏃</div>`,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
       });
-      markerRef.current = L.marker([status.lat, status.lon], { icon: runnerIcon }).addTo(map);
+      markerRef.current = L.marker([status.lat, status.lon], {
+        icon: runnerIcon,
+        zIndexOffset: 1000,
+      }).addTo(map);
       markerRef.current.bindTooltip(status.runnerName, {
         permanent: true,
         direction: 'top',
-        offset: [0, -20],
+        offset: [0, -22],
+        className: 'tracked-runner-tooltip',
       });
     }
 
-    // Initial fit bounds to checkpoints + runner
+    // Fit bounds to checkpoints + runner
     const allPoints: [number, number][] = status.checkpoints.map((cp) => [cp.la, cp.lo]);
     if (status.lat !== 0 || status.lon !== 0) allPoints.push([status.lat, status.lon]);
     if (allPoints.length > 1) {
@@ -118,7 +122,6 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
             lineJoin: 'round',
           }).addTo(mapInstance.current);
 
-          // Re-fit bounds to include route
           const routeBounds = routeRef.current.getBounds();
           const cpBounds = L.latLngBounds(
             status.checkpoints.map((cp: any) => [cp.la, cp.lo])
@@ -140,7 +143,7 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
     };
   }, []);
 
-  // Update runner position when data refreshes
+  // Update tracked runner position when data refreshes
   useEffect(() => {
     if (!mapInstance.current) return;
     if (status.lat === 0 && status.lon === 0) return;
@@ -148,23 +151,78 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
     if (markerRef.current) {
       markerRef.current.setLatLng([status.lat, status.lon]);
     } else {
-      // Create marker if it didn't exist on init
       const runnerIcon = L.divIcon({
         className: 'runner-marker',
-        html: `<div style="background:#2196F3;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.5);">🏃</div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
+        html: `<div style="background:#2196F3;color:#fff;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.5);">🏃</div>`,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
       });
-      markerRef.current = L.marker([status.lat, status.lon], { icon: runnerIcon }).addTo(mapInstance.current);
+      markerRef.current = L.marker([status.lat, status.lon], {
+        icon: runnerIcon,
+        zIndexOffset: 1000,
+      }).addTo(mapInstance.current);
       markerRef.current.bindTooltip(status.runnerName, {
         permanent: true,
         direction: 'top',
-        offset: [0, -20],
+        offset: [0, -22],
+        className: 'tracked-runner-tooltip',
       });
     }
 
     mapInstance.current.panTo([status.lat, status.lon], { animate: true });
   }, [status.lat, status.lon]);
+
+  // Update all runner dots on each data refresh
+  useEffect(() => {
+    if (!mapInstance.current || !status.allClasses) return;
+
+    // Clear existing runner dots
+    runnerDotsRef.current.forEach((m) => m.remove());
+    runnerDotsRef.current = [];
+
+    for (const cls of status.allClasses) {
+      const isFemale = cls.classname.toLowerCase().includes('female');
+      const dotColor = isFemale ? '#ec4899' : '#3b82f6'; // pink for female, blue for male
+
+      for (const runner of cls.teams) {
+        // Skip the tracked runner — they have the 🏃 icon
+        if (runner.r === status.bibNumber) continue;
+
+        const [latStr, lonStr] = (runner.ll || '').split(',');
+        const lat = parseFloat(latStr);
+        const lon = parseFloat(lonStr);
+        if (isNaN(lat) || isNaN(lon) || (lat === 0 && lon === 0)) continue;
+
+        const dot = L.circleMarker([lat, lon], {
+          radius: 7,
+          color: '#fff',
+          weight: 1.5,
+          fillColor: dotColor,
+          fillOpacity: 0.85,
+        }).addTo(mapInstance.current);
+
+        // Popup with runner details on tap/click
+        const checkpoint = runner.lc || 'N/A';
+        const time = runner.t || 'N/A';
+        const speed = runner.sp ? `${runner.sp} km/h` : 'N/A';
+        const ageGroup = runner.ag || runner.g || 'N/A';
+        const finStatus = runner.fin === 1 ? '<br/>🏁 <strong>Finished</strong>' : '';
+
+        dot.bindPopup(`
+          <div style="font-size:13px;line-height:1.6;min-width:140px;">
+            <strong>${runner.n}</strong><br/>
+            🏷 Bib #${runner.r}<br/>
+            📍 ${checkpoint}<br/>
+            ⏱ ${time}<br/>
+            👤 ${ageGroup}<br/>
+            💨 ${speed}${finStatus}
+          </div>
+        `);
+
+        runnerDotsRef.current.push(dot);
+      }
+    }
+  }, [status]);
 
   return <div ref={mapRef} style={{ width: '100%', height: '100%', minHeight: '300px' }} />;
 };
