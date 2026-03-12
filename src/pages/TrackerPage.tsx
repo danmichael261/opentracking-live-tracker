@@ -4,9 +4,11 @@ import { RefreshCw, ArrowLeft, Share2, AlertCircle, Bell } from 'lucide-react';
 import { TrackerStatus, RunnerData } from '../types';
 import { fetchTeams, fetchCheckpoints, fetchConfig } from '../utils/api';
 import { computePositions } from '../utils/positions';
+import { saveRecentRunner } from '../utils/recentRunners';
 import { RaceMap } from '../components/RaceMap';
 import { StatsPanel } from '../components/StatsPanel';
 import { NotifyModal } from '../components/NotifyModal';
+import { CheerWall } from '../components/CheerWall';
 
 const REFRESH_INTERVAL = 30000; // 30 seconds
 
@@ -66,11 +68,22 @@ export const TrackerPage: React.FC = () => {
       // Compute positions with fixed algorithm
       const positions = computePositions(runner, teamsData.data, checkpointOrder, genderClass);
 
+      const eventName = configData.name || event;
+
+      // Save to recent runners (localStorage)
+      saveRecentRunner({
+        event,
+        bib: bibNumber,
+        name: runner.n,
+        eventName,
+        timestamp: Date.now(),
+      });
+
       setStatus({
         runner,
         runnerName: runner.n,
         bibNumber,
-        eventName: configData.name || event,
+        eventName,
         lat,
         lon,
         checkpoints: cpData.data,
@@ -84,6 +97,7 @@ export const TrackerPage: React.FC = () => {
         ageGroup: runner.ag || runner.g || 'N/A',
         genderClass,
         elapsedTime: runner.t || 'N/A',
+        allClasses: teamsData.data,
       });
 
       setError(null);
@@ -209,6 +223,9 @@ export const TrackerPage: React.FC = () => {
               Live Updates
             </button>
           </div>
+
+          {/* Cheer Wall */}
+          <CheerWall eventCode={event || ''} bibNumber={bibNumber} />
         </div>
       </div>
 
