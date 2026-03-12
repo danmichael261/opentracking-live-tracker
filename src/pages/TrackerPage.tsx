@@ -121,12 +121,24 @@ export const TrackerPage: React.FC = () => {
 
   const handleShare = async () => {
     const url = window.location.href;
+    const title = `Track ${status?.runnerName || 'runner'} - ${status?.eventName || 'Live Race'}`;
+
+    // Use native share sheet on mobile if available
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch {
+        // User cancelled or share failed — fall through to clipboard
+      }
+    }
+
+    // Fallback: copy to clipboard
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback for older browsers
       const input = document.createElement('input');
       input.value = url;
       document.body.appendChild(input);
@@ -134,7 +146,7 @@ export const TrackerPage: React.FC = () => {
       document.execCommand('copy');
       document.body.removeChild(input);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2500);
     }
   };
 
@@ -183,11 +195,9 @@ export const TrackerPage: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <div className="tooltip tooltip-bottom" data-tip={copied ? 'Copied!' : 'Copy link'}>
-            <button className="btn btn-ghost btn-sm btn-square" onClick={handleShare}>
-              <Share2 size={16} />
-            </button>
-          </div>
+          <button className="btn btn-ghost btn-sm btn-square" onClick={handleShare}>
+            <Share2 size={16} />
+          </button>
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => refresh(true)}
@@ -228,6 +238,15 @@ export const TrackerPage: React.FC = () => {
           <CheerWall eventCode={event || ''} bibNumber={bibNumber} />
         </div>
       </div>
+
+      {/* Copied toast */}
+      {copied && (
+        <div className="toast toast-top toast-center z-[10000]">
+          <div className="alert alert-success py-2 px-4 shadow-lg">
+            <span className="text-sm font-medium">✅ Link copied to clipboard!</span>
+          </div>
+        </div>
+      )}
 
       {/* Notification subscription modal */}
       <NotifyModal
