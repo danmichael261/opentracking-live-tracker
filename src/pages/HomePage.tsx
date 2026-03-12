@@ -1,17 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowRight, MapPin, Radio } from 'lucide-react';
+import { Search, ArrowRight, MapPin, Radio, X, Clock } from 'lucide-react';
+import { getRecentRunners, removeRecentRunner, RecentRunner } from '../utils/recentRunners';
 
 export const HomePage: React.FC = () => {
   const [event, setEvent] = useState('');
   const [bib, setBib] = useState('');
+  const [recents, setRecents] = useState<RecentRunner[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setRecents(getRecentRunners());
+  }, []);
 
   const handleTrack = (e: React.FormEvent) => {
     e.preventDefault();
     if (event.trim() && bib.trim()) {
       navigate(`/${event.trim().toLowerCase()}/${bib.trim()}`);
     }
+  };
+
+  const handleRemoveRecent = (e: React.MouseEvent, runner: RecentRunner) => {
+    e.stopPropagation();
+    removeRecentRunner(runner.event, runner.bib);
+    setRecents(getRecentRunners());
   };
 
   return (
@@ -77,6 +89,43 @@ export const HomePage: React.FC = () => {
               </button>
             </div>
           </form>
+
+          {/* Recent Runners */}
+          {recents.length > 0 && (
+            <div className="mt-6">
+              <h2 className="text-sm font-semibold text-base-content/60 mb-3 flex items-center gap-2">
+                <Clock size={14} /> RECENT RUNNERS
+              </h2>
+              <div className="flex flex-col gap-2">
+                {recents.map((r) => (
+                  <button
+                    key={`${r.event}-${r.bib}`}
+                    className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer text-left"
+                    onClick={() => navigate(`/${r.event}/${r.bib}`)}
+                  >
+                    <div className="card-body p-3 flex-row items-center gap-3">
+                      <span className="text-2xl">🏃</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-base-content truncate">
+                          {r.name}
+                        </div>
+                        <div className="text-xs text-base-content/50">
+                          {r.eventName} · Bib #{r.bib}
+                        </div>
+                      </div>
+                      <div
+                        className="btn btn-ghost btn-xs btn-square"
+                        onClick={(e) => handleRemoveRecent(e, r)}
+                        title="Remove"
+                      >
+                        <X size={14} />
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* How it works */}
           <div className="mt-8 text-center">
