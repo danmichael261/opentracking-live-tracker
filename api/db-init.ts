@@ -7,6 +7,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    // Subscriptions table (notifications)
     await sql`
       CREATE TABLE IF NOT EXISTS subscriptions (
         id SERIAL PRIMARY KEY,
@@ -28,7 +29,24 @@ export default async function handler(req: any, res: any) {
       ON subscriptions(event_code, bib_number) WHERE active = TRUE
     `;
 
-    return res.status(200).json({ success: true, message: 'Database initialized' });
+    // Cheers table (cheer wall messages)
+    await sql`
+      CREATE TABLE IF NOT EXISTS cheers (
+        id SERIAL PRIMARY KEY,
+        event_code VARCHAR(100) NOT NULL,
+        bib_number INTEGER NOT NULL,
+        sender_name VARCHAR(100) NOT NULL,
+        message VARCHAR(200) NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_cheers_event_bib 
+      ON cheers(event_code, bib_number)
+    `;
+
+    return res.status(200).json({ success: true, message: 'Database initialized (subscriptions + cheers tables)' });
   } catch (err: any) {
     console.error('DB init error:', err);
     return res.status(500).json({ error: err.message });
