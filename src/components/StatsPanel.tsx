@@ -61,9 +61,9 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({ status, lastRefresh }) =
         <StatCard icon={<Clock size={16} />} label="Elapsed Time" value={status.elapsedTime} />
         <StatCard icon={<Zap size={16} />} label="Speed" value={speed > 0 ? `${runner.sp} km/h` : 'N/A'} />
         <StatCard
-          icon={<Award size={16} />}
-          label={`${status.ageGroup} Pos`}
-          value={`${status.ageGroupPosition} / ${status.ageGroupTotal}`}
+          icon={<Users size={16} />}
+          label="Overall Pos"
+          value={`${status.overallPosition} / ${status.overallTotal}`}
         />
         <StatCard
           icon={<Trophy size={16} />}
@@ -71,9 +71,9 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({ status, lastRefresh }) =
           value={`${status.genderPosition} / ${status.genderTotal}`}
         />
         <StatCard
-          icon={<Users size={16} />}
-          label="Overall Pos"
-          value={`${status.overallPosition} / ${status.overallTotal}`}
+          icon={<Award size={16} />}
+          label={`${status.ageGroup} Pos`}
+          value={`${status.ageGroupPosition} / ${status.ageGroupTotal}`}
         />
       </div>
 
