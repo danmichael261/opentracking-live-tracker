@@ -67,4 +67,12 @@ export interface TrackerStatus {
   ageGroup: string;
   genderClass: string;
   elapsedTime: string;
+  allClasses: ClassData[];
+}
+
+export interface Cheer {
+  id: number;
+  sender_name: string;
+  message: string;
+  created_at: string;
 }
