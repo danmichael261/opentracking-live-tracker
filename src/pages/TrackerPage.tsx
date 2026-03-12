@@ -241,8 +241,8 @@ export const TrackerPage: React.FC = () => {
 
       {/* Copied toast */}
       {copied && (
-        <div className="toast toast-top toast-center z-[10000]">
-          <div className="alert alert-success py-2 px-4 shadow-lg">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[99999]">
+          <div className="alert alert-success py-2 px-4 shadow-lg rounded-lg">
             <span className="text-sm font-medium">✅ Link copied to clipboard!</span>
           </div>
         </div>
