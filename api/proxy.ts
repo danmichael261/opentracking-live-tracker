@@ -27,27 +27,49 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: `Invalid file. Allowed: ${ALLOWED_FILES.join(', ')} or {event}.kml` });
   }
 
-  const url = `https://live.opentracking.co.uk/${event}/data/${file}`;
+  // Try the event code as-is first, then case variations if 404
+  // OpenTracking URLs are case-sensitive (e.g. "HH50K-2026" works but "hh50k-2026" doesn't)
+  const casesToTry = [
+    event,
+    event.toUpperCase(),
+    event.toLowerCase(),
+    // Mixed: uppercase first letter of each segment (e.g. "hh50k-2026" -> "Hh50k-2026")
+  ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
 
-  try {
-    const response = await fetch(url);
+  for (const tryEvent of casesToTry) {
+    const kmlFile = isKml ? `${tryEvent}.kml` : file;
+    const url = `https://live.opentracking.co.uk/${tryEvent}/data/${kmlFile}`;
 
-    if (!response.ok) {
+    try {
+      const response = await fetch(url);
+
+      if (response.ok) {
+        const data = await response.text();
+        const contentType = isKml ? 'application/xml' : 'application/json';
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        // Return the resolved event code so frontend can correct itself
+        res.setHeader('X-Resolved-Event', tryEvent);
+        return res.status(200).send(data);
+      }
+
+      // If 404, try next case variation
+      if (response.status === 404) continue;
+
+      // Other errors, return immediately
       return res.status(response.status).json({
         error: `OpenTracking returned ${response.status}. Check the event code is correct.`,
       });
+    } catch (err: any) {
+      // Network error on this attempt, try next
+      continue;
     }
-
-    const data = await response.text();
-    const contentType = isKml ? 'application/xml' : 'application/json';
-
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    return res.status(200).send(data);
-  } catch (err: any) {
-    return res.status(500).json({
-      error: 'Failed to fetch data from OpenTracking. The service may be temporarily unavailable.',
-    });
   }
+
+  // All case variations failed
+  return res.status(404).json({
+    error: 'Event not found on OpenTracking. Check the event code is correct.',
+  });
 }
