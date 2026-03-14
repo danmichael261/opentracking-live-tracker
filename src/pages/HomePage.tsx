@@ -16,7 +16,7 @@ export const HomePage: React.FC = () => {
   const handleTrack = (e: React.FormEvent) => {
     e.preventDefault();
     if (event.trim() && bib.trim()) {
-      navigate(`/${event.trim().toLowerCase()}/${bib.trim()}`);
+      navigate(`/${event.trim()}/${bib.trim()}`);
     }
   };
 
