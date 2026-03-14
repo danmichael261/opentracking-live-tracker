@@ -33,6 +33,28 @@ function parseKML(kmlText: string): [number, number][] {
   return coords;
 }
 
+/** Create the tracked runner divIcon */
+function createRunnerIcon(L: any) {
+  return L.divIcon({
+    className: 'runner-marker',
+    html: `<div style="
+      background: #e53e3e;
+      color: #fff;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      border: 4px solid #fff;
+      box-shadow: 0 0 0 3px #e53e3e, 0 4px 12px rgba(0,0,0,0.5);
+    ">🏃</div>`,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+  });
+}
+
 export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -82,22 +104,16 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
       cpMarkersRef.current.push(m);
     });
 
-    // Tracked runner marker with 🏃 emoji
+    // Tracked runner marker — large red circle with 🏃 emoji
     if (status.lat !== 0 || status.lon !== 0) {
-      const runnerIcon = L.divIcon({
-        className: 'runner-marker',
-        html: `<div style="background:#2196F3;color:#fff;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.5);">🏃</div>`,
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
-      });
       markerRef.current = L.marker([status.lat, status.lon], {
-        icon: runnerIcon,
-        zIndexOffset: 1000,
+        icon: createRunnerIcon(L),
+        zIndexOffset: 10000,
       }).addTo(map);
       markerRef.current.bindTooltip(status.runnerName, {
         permanent: true,
         direction: 'top',
-        offset: [0, -22],
+        offset: [0, -28],
         className: 'tracked-runner-tooltip',
       });
     }
@@ -151,20 +167,14 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
     if (markerRef.current) {
       markerRef.current.setLatLng([status.lat, status.lon]);
     } else {
-      const runnerIcon = L.divIcon({
-        className: 'runner-marker',
-        html: `<div style="background:#2196F3;color:#fff;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.5);">🏃</div>`,
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
-      });
       markerRef.current = L.marker([status.lat, status.lon], {
-        icon: runnerIcon,
-        zIndexOffset: 1000,
+        icon: createRunnerIcon(L),
+        zIndexOffset: 10000,
       }).addTo(mapInstance.current);
       markerRef.current.bindTooltip(status.runnerName, {
         permanent: true,
         direction: 'top',
-        offset: [0, -22],
+        offset: [0, -28],
         className: 'tracked-runner-tooltip',
       });
     }
@@ -221,6 +231,12 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
 
         runnerDotsRef.current.push(dot);
       }
+    }
+
+    // Re-add tracked runner marker to ensure it's on top of all dots
+    if (markerRef.current) {
+      markerRef.current.remove();
+      markerRef.current.addTo(mapInstance.current);
     }
   }, [status]);
 
