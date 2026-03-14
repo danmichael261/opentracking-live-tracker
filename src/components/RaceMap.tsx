@@ -33,32 +33,12 @@ function parseKML(kmlText: string): [number, number][] {
   return coords;
 }
 
-/** Create the tracked runner divIcon */
-function createRunnerIcon(L: any) {
-  return L.divIcon({
-    className: 'runner-marker',
-    html: `<div style="
-      background: #e53e3e;
-      color: #fff;
-      border-radius: 50%;
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 26px;
-      border: 4px solid #fff;
-      box-shadow: 0 0 0 3px #e53e3e, 0 4px 12px rgba(0,0,0,0.5);
-    ">🏃</div>`,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
-  });
-}
-
 export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const trackedMarkerRef = useRef<any>(null);
+  const trackedLabelRef = useRef<any>(null);
+  const trackedPulseRef = useRef<any>(null);
   const cpMarkersRef = useRef<any[]>([]);
   const routeRef = useRef<any>(null);
   const runnerDotsRef = useRef<any[]>([]);
@@ -68,6 +48,9 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
     if (status.checkpoints.length > 0) return [status.checkpoints[0].la, status.checkpoints[0].lo];
     return [54.5, -2.5]; // UK default
   };
+
+  const isValidCoord = (lat: number, lon: number) =>
+    !isNaN(lat) && !isNaN(lon) && !(lat === 0 && lon === 0);
 
   // Initialize map (runs once)
   useEffect(() => {
@@ -104,23 +87,56 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
       cpMarkersRef.current.push(m);
     });
 
-    // Tracked runner marker — large red circle with 🏃 emoji
-    if (status.lat !== 0 || status.lon !== 0) {
-      markerRef.current = L.marker([status.lat, status.lon], {
-        icon: createRunnerIcon(L),
-        zIndexOffset: 10000,
+    // Tracked runner marker — large red circle + pulsing ring + name label
+    if (isValidCoord(status.lat, status.lon)) {
+      // Outer pulsing ring (larger, semi-transparent)
+      trackedPulseRef.current = L.circleMarker([status.lat, status.lon], {
+        radius: 18,
+        color: '#dc2626',
+        weight: 3,
+        opacity: 0.5,
+        fillColor: '#dc2626',
+        fillOpacity: 0.15,
+        pane: 'markerPane',
       }).addTo(map);
-      markerRef.current.bindTooltip(status.runnerName, {
-        permanent: true,
-        direction: 'top',
-        offset: [0, -28],
-        className: 'tracked-runner-tooltip',
-      });
+
+      // Inner solid circle (the main marker)
+      trackedMarkerRef.current = L.circleMarker([status.lat, status.lon], {
+        radius: 11,
+        color: '#fff',
+        weight: 3,
+        fillColor: '#dc2626',
+        fillOpacity: 1,
+        pane: 'markerPane',
+      }).addTo(map);
+
+      // Name label above the marker
+      trackedLabelRef.current = L.marker([status.lat, status.lon], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:bold;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:2px solid #fff;">🏃 ${status.runnerName}</div>`,
+          iconSize: [0, 0],
+          iconAnchor: [0, 35],
+        }),
+        zIndexOffset: 10000,
+        interactive: false,
+      }).addTo(map);
+
+      // Popup on tracked marker
+      trackedMarkerRef.current.bindPopup(`
+        <div style="font-size:13px;line-height:1.6;min-width:140px;">
+          <strong>🏃 ${status.runnerName}</strong><br/>
+          🏷 Bib #${status.bibNumber}<br/>
+          ⏱ ${status.elapsedTime || 'N/A'}<br/>
+          📍 ${status.runner?.lc || 'N/A'}<br/>
+          💨 ${status.runner?.sp ? status.runner.sp + ' km/h' : 'N/A'}
+        </div>
+      `);
     }
 
     // Fit bounds to checkpoints + runner
     const allPoints: [number, number][] = status.checkpoints.map((cp) => [cp.la, cp.lo]);
-    if (status.lat !== 0 || status.lon !== 0) allPoints.push([status.lat, status.lon]);
+    if (isValidCoord(status.lat, status.lon)) allPoints.push([status.lat, status.lon]);
     if (allPoints.length > 1) {
       map.fitBounds(allPoints, { padding: [30, 30] });
     }
@@ -143,7 +159,7 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
             status.checkpoints.map((cp: any) => [cp.la, cp.lo])
           );
           const combined = routeBounds.extend(cpBounds);
-          if (status.lat !== 0 || status.lon !== 0) {
+          if (isValidCoord(status.lat, status.lon)) {
             combined.extend([status.lat, status.lon]);
           }
           mapInstance.current.fitBounds(combined, { padding: [30, 30] });
@@ -162,24 +178,53 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
   // Update tracked runner position when data refreshes
   useEffect(() => {
     if (!mapInstance.current) return;
-    if (status.lat === 0 && status.lon === 0) return;
+    if (!isValidCoord(status.lat, status.lon)) return;
 
-    if (markerRef.current) {
-      markerRef.current.setLatLng([status.lat, status.lon]);
+    const pos: [number, number] = [status.lat, status.lon];
+
+    if (trackedMarkerRef.current) {
+      trackedMarkerRef.current.setLatLng(pos);
     } else {
-      markerRef.current = L.marker([status.lat, status.lon], {
-        icon: createRunnerIcon(L),
-        zIndexOffset: 10000,
+      trackedMarkerRef.current = L.circleMarker(pos, {
+        radius: 11,
+        color: '#fff',
+        weight: 3,
+        fillColor: '#dc2626',
+        fillOpacity: 1,
+        pane: 'markerPane',
       }).addTo(mapInstance.current);
-      markerRef.current.bindTooltip(status.runnerName, {
-        permanent: true,
-        direction: 'top',
-        offset: [0, -28],
-        className: 'tracked-runner-tooltip',
-      });
     }
 
-    mapInstance.current.panTo([status.lat, status.lon], { animate: true });
+    if (trackedPulseRef.current) {
+      trackedPulseRef.current.setLatLng(pos);
+    } else {
+      trackedPulseRef.current = L.circleMarker(pos, {
+        radius: 18,
+        color: '#dc2626',
+        weight: 3,
+        opacity: 0.5,
+        fillColor: '#dc2626',
+        fillOpacity: 0.15,
+        pane: 'markerPane',
+      }).addTo(mapInstance.current);
+    }
+
+    if (trackedLabelRef.current) {
+      trackedLabelRef.current.setLatLng(pos);
+    } else {
+      trackedLabelRef.current = L.marker(pos, {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:bold;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:2px solid #fff;">🏃 ${status.runnerName}</div>`,
+          iconSize: [0, 0],
+          iconAnchor: [0, 35],
+        }),
+        zIndexOffset: 10000,
+        interactive: false,
+      }).addTo(mapInstance.current);
+    }
+
+    mapInstance.current.panTo(pos, { animate: true });
   }, [status.lat, status.lon]);
 
   // Update all runner dots on each data refresh
@@ -195,7 +240,7 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
       const dotColor = isFemale ? '#ec4899' : '#3b82f6'; // pink for female, blue for male
 
       for (const runner of cls.teams) {
-        // Skip the tracked runner — they have the 🏃 icon
+        // Skip the tracked runner — they have the red marker
         if (runner.r === status.bibNumber) continue;
 
         const [latStr, lonStr] = (runner.ll || '').split(',');
@@ -232,13 +277,13 @@ export const RaceMap: React.FC<RaceMapProps> = ({ status, event }) => {
         runnerDotsRef.current.push(dot);
       }
     }
+  }, [status.allClasses]);
 
-    // Re-add tracked runner marker to ensure it's on top of all dots
-    if (markerRef.current) {
-      markerRef.current.remove();
-      markerRef.current.addTo(mapInstance.current);
-    }
-  }, [status]);
-
-  return <div ref={mapRef} style={{ width: '100%', height: '100%', minHeight: '300px' }} />;
+  return (
+    <div
+      ref={mapRef}
+      className="w-full rounded-xl overflow-hidden shadow-lg"
+      style={{ height: '350px' }}
+    />
+  );
 };
